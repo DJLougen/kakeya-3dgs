@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kakeya Algorithm Test</title>
+<style>
+body { font-family: monospace; background: #050507; color: #e8e8ec; padding: 20px; }
+h1 { color: #76b900; }
+.test { margin: 10px 0; padding: 10px; background: #0c0c10; border-radius: 4px; }
+.pass { color: #76b900; }
+.fail { color: #ff3b5c; }
+</style>
+</head>
+<body>
+<h1>Kakeya Algorithm Test</h1>
+<div id="results"></div>
+
+<script src="./kakeya_algorithm.js"></script>
+<script>
+const results = document.getElementById('results');
+
+function log(msg, pass = true) {
+  const div = document.createElement('div');
+  div.className = 'test ' + (pass ? 'pass' : 'fail');
+  div.textContent = (pass ? '✓ ' : '✗ ') + msg;
+  results.appendChild(div);
+  console.log((pass ? 'PASS: ' : 'FAIL: ') + msg);
+}
+
+// Test 1: Algorithm loaded
+if (typeof KakeyaAlgorithm !== 'undefined') {
+  log('Algorithm loaded successfully');
+} else {
+  log('Algorithm failed to load', false);
+  throw new Error('Algorithm not loaded');
+}
+
+// Test 2: Check methods exist
+const methods = ['polynomialPartition2D', 'computeCellStats', 'projectTo2D', 'partition3DGaussians'];
+methods.forEach(method => {
+  if (typeof KakeyaAlgorithm[method] === 'function') {
+    log(`Method ${method} exists`);
+  } else {
+    log(`Method ${method} missing`, false);
+  }
+});
+
+// Test 3: Run partition on simple data
+const xy = new Float32Array([
+  0.1, 0.1,
+  0.2, 0.2,
+  0.8, 0.8,
+  0.9, 0.9,
+  0.5, 0.5
+]);
+
+const result = KakeyaAlgorithm.polynomialPartition2D(xy, 5, 4);
+if (result.cellIds && result.cellIds.length === 5 && result.partitionTime >= 0) {
+  log(`Partition executed: ${result.partitionTime.toFixed(3)}ms, cells: ${Array.from(result.cellIds)}`);
+} else {
+  log('Partition execution failed', false);
+}
+
+// Test 4: Compute stats
+const stats = KakeyaAlgorithm.computeCellStats(result.cellIds, 5);
+if (stats.mean > 0 && stats.max > 0) {
+  log(`Stats computed: mean=${stats.mean.toFixed(2)}, max=${stats.max}, cv=${stats.cv.toFixed(3)}`);
+} else {
+  log('Stats computation failed', false);
+}
+
+// Test 5: Performance test with larger dataset
+const largeXY = new Float32Array(10000 * 2);
+for (let i = 0; i < 10000; i++) {
+  largeXY[i * 2] = Math.random();
+  largeXY[i * 2 + 1] = Math.random();
+}
+
+const start = performance.now();
+const largeResult = KakeyaAlgorithm.polynomialPartition2D(largeXY, 10000, 144);
+const elapsed = performance.now() - start;
+
+if (largeResult.cellIds && largeResult.cellIds.length === 10000) {
+  log(`Performance test: 10,000 points partitioned in ${elapsed.toFixed(2)}ms`);
+} else {
+  log('Performance test failed', false);
+}
+
+log('All tests completed!');
+</script>
+</body>
+</html>
