@@ -157,7 +157,235 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans)}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="./kakeya_algorithm.js"></script>
+<script>
+/**
+ * Kakeya Polynomial Partitioning Algorithm (JavaScript Implementation)
+ *
+ * This is a direct port of the Python implementation from src/gaussian_splatting.py
+ * Runs the real algorithm on the user's hardware via WebAssembly/JavaScript.
+ *
+ * The algorithm uses quantile-based partitioning (k-d tree style) for guaranteed
+ * load balance, which is equivalent to recursive polynomial partitioning with
+ * degree-1 polynomials (axis-aligned splits).
+ */
+
+const KakeyaAlgorithm = (() => {
+  'use strict';
+
+  /**
+   * Partition 2D points for balanced cell assignment.
+   *
+   * Uses iterative BFS with alternating x/y median splits (k-d tree approach).
+   * Guarantees balanced partition sizes.
+   *
+   * @param {Float32Array} xy - (N, 2) point coordinates, should be normalized to [0, 1]
+   * @param {number} n - Number of points
+   * @param {number} numCells - Target number of cells (rounded up to power of 2)
+   * @returns {Object} { cellIds: Int32Array, partitionTime: number }
+   */
+  function polynomialPartition2D(xy, n, numCells = 16) {
+    const startTime = performance.now();
+
+    if (n === 0) {
+      return { cellIds: new Int32Array(0), partitionTime: 0 };
+    }
+
+    const cellIds = new Int32Array(n);
+    const depth = Math.max(1, Math.ceil(Math.log2(Math.max(1, numCells))));
+
+    // Queue entries: [indices, cellBase, bitOffset, splitDim]
+    let queue = [[Array.from({ length: n }, (_, i) => i), 0, 0, 0]];
+
+    for (let level = 0; level < depth; level++) {
+      const nextQueue = [];
+
+      for (const [indices, cellBase, bitOffset, splitDim] of queue) {
+        if (indices.length <= 1) continue;
+
+        const dim = splitDim % 2;
+
+        // Extract values for current dimension
+        const values = new Float32Array(indices.length);
+        for (let i = 0; i < indices.length; i++) {
+          values[i] = xy[indices[i] * 2 + dim];
+        }
+
+        // Find median
+        const sorted = Array.from(values).sort((a, b) => a - b);
+        const medianVal = sorted[Math.floor(sorted.length / 2)];
+
+        // Split by median
+        const posIndices = [];
+        const negIndices = [];
+
+        for (let i = 0; i < indices.length; i++) {
+          if (values[i] >= medianVal) {
+            posIndices.push(indices[i]);
+          } else {
+            negIndices.push(indices[i]);
+          }
+        }
+
+        // Handle edge case: all points on one side
+        if (posIndices.length === 0 || negIndices.length === 0) {
+          const mid = Math.floor(indices.length / 2);
+          const sortedIndices = indices.slice().sort((a, b) =>
+            xy[a * 2 + dim] - xy[b * 2 + dim]
+          );
+          posIndices.length = 0;
+          negIndices.length = 0;
+          for (let i = 0; i < sortedIndices.length; i++) {
+            if (i >= mid) {
+              posIndices.push(sortedIndices[i]);
+            } else {
+              negIndices.push(sortedIndices[i]);
+            }
+          }
+        }
+
+        // Assign cell IDs and continue recursion
+        if (posIndices.length > 0) {
+          for (const idx of posIndices) {
+            cellIds[idx] = cellBase;
+          }
+          nextQueue.push([posIndices, cellBase, bitOffset + 1, splitDim + 1]);
+        }
+
+        if (negIndices.length > 0) {
+          const rightId = cellBase + (1 << bitOffset);
+          for (const idx of negIndices) {
+            cellIds[idx] = rightId;
+          }
+          nextQueue.push([negIndices, rightId, bitOffset + 1, splitDim + 1]);
+        }
+      }
+
+      queue = nextQueue;
+    }
+
+    // Remap cell IDs to contiguous range
+    const uniqueIds = new Set(cellIds);
+    const remap = new Map();
+    let newId = 0;
+    for (const old of uniqueIds) {
+      remap.set(old, newId++);
+    }
+
+    for (let i = 0; i < n; i++) {
+      cellIds[i] = remap.get(cellIds[i]);
+    }
+
+    const partitionTime = performance.now() - startTime;
+    return { cellIds, partitionTime };
+  }
+
+  /**
+   * Compute cell statistics from partition results.
+   *
+   * @param {Int32Array} cellIds - Cell assignments
+   * @param {number} n - Number of points
+   * @returns {Object} { mean, std, max, cv (coefficient of variation) }
+   */
+  function computeCellStats(cellIds, n) {
+    const cellCounts = new Map();
+
+    for (let i = 0; i < n; i++) {
+      const id = cellIds[i];
+      cellCounts.set(id, (cellCounts.get(id) || 0) + 1);
+    }
+
+    const counts = Array.from(cellCounts.values());
+    if (counts.length === 0) {
+      return { mean: 0, std: 0, max: 0, cv: 0 };
+    }
+
+    const sum = counts.reduce((a, b) => a + b, 0);
+    const mean = sum / counts.length;
+
+    const sqSum = counts.reduce((a, b) => a + b * b, 0);
+    const std = Math.sqrt(sqSum / counts.length - mean * mean);
+
+    const max = Math.max(...counts);
+    const cv = mean > 0 ? std / mean : 0;
+
+    return { mean, std, max, cv };
+  }
+
+  /**
+   * Project 3D points to 2D screen space and normalize to [0, 1].
+   *
+   * @param {Float32Array} pos3d - (N, 3) 3D positions
+   * @param {number} n - Number of points
+   * @param {number} width - Screen width
+   * @param {number} height - Screen height
+   * @param {THREE.Camera} camera - Three.js camera
+   * @returns {Float32Array} (N, 2) normalized 2D coordinates
+   */
+  function projectTo2D(pos3d, n, width, height, camera) {
+    const xy = new Float32Array(n * 2);
+    const v = new THREE.Vector3();
+
+    for (let i = 0; i < n; i++) {
+      v.set(pos3d[i * 3], pos3d[i * 3 + 1], pos3d[i * 3 + 2]);
+      v.project(camera);
+
+      // Convert from [-1, 1] to [0, 1]
+      xy[i * 2] = (v.x + 1) / 2;
+      xy[i * 2 + 1] = (v.y + 1) / 2;
+    }
+
+    return xy;
+  }
+
+  /**
+   * Full Kakeya partitioning pipeline for 3D Gaussians.
+   *
+   * @param {Float32Array} pos3d - (N, 3) 3D positions
+   * @param {number} n - Number of points
+   * @param {number} width - Screen width
+   * @param {number} height - Screen height
+   * @param {THREE.Camera} camera - Three.js camera
+   * @param {number} numCells - Target number of cells
+   * @returns {Object} { cellIds, xy2d, partitionTime, stats }
+   */
+  function partition3DGaussians(pos3d, n, width, height, camera, numCells = 16) {
+    const totalStart = performance.now();
+
+    // Project to 2D
+    const xy2d = projectTo2D(pos3d, n, width, height, camera);
+
+    // Partition
+    const { cellIds, partitionTime } = polynomialPartition2D(xy2d, n, numCells);
+
+    // Compute stats
+    const stats = computeCellStats(cellIds, n);
+
+    const totalTime = performance.now() - totalStart;
+
+    return {
+      cellIds,
+      xy2d,
+      partitionTime,
+      stats,
+      totalTime
+    };
+  }
+
+  return {
+    polynomialPartition2D,
+    computeCellStats,
+    projectTo2D,
+    partition3DGaussians
+  };
+})();
+
+// Export for both Node.js and browser
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = KakeyaAlgorithm;
+} else if (typeof window !== 'undefined') {
+  window.KakeyaAlgorithm = KakeyaAlgorithm;
+}
+</script>
 <script>
 let realPartitionTime = 0;
 let realBalanceRatio = 0;
@@ -189,7 +417,9 @@ function computeTiles(){if(!pts)return;tN.fill(0);const pos=pts.geometry.attribu
     const pos3d=pts.geometry.attributes.position.array;
     const result=KakeyaAlgorithm.partition3DGaussians(pos3d,n,w,h,cam,TC*TR);
     realPartitionTime=result.partitionTime;
-    realCellCount=Object.keys(result.stats).length;
+    // Count unique cell IDs
+    const uniqueCells = new Set(result.cellIds);
+    realCellCount = uniqueCells.size;
     const naiveStats=tileStats(tN);
     realBalanceRatio=(naiveStats.max/result.stats.max).toFixed(2);
 
@@ -217,8 +447,6 @@ function computeTiles(){if(!pts)return;tN.fill(0);const pos=pts.geometry.attribu
   }
 
   fitPolys(proj,w,h)}
-function fitPolys(proj,w,h){if(proj.length<50)return;polys=[];const nx=p=>(p.x/w)*2-1,ny=p=>(p.y/h)*2-1;for(let k=0;k<3;k++){let best=null,bestBal=Infinity;for(let t=0;t<60;t++){const a=(Math.random()-.5)*.5,b=(Math.random()-.5)*2,c=(Math.random()-.5)*2,d=(Math.random()-.5)*1.5,e=(Math.random()-.5)*1.5,f=(Math.random()-.5)*1.5;let pos=0,neg=0;for(const p of proj){const x=nx(p),y=ny(p);(a+b*x+c*y+d*x*x+e*x*y+f*y*y>0)?pos++:neg++}const bal=Math.abs(pos-neg)/proj.length;if(bal<bestBal){bestBal=bal;best={a,b,c,d,e,f}}}polys.push(best)}}
-function tileStats(loads){let s=0,sq=0,mx=0,nz=0;for(let i=0;i<loads.length;i++)if(loads[i]>0){s+=loads[i];sq+=loads[i]*loads[i];mx=Math.max(mx,loads[i]);nz++}const mn=nz?s/nz:1,std=Math.sqrt(sq/nz-mn*mn);return{mean:mn,std,max:mx,cv:mn>0?std/mn:0}}
 
 const oc=document.getElementById('overlay'),ox=oc.getContext('2d');
 function drawOverlay(){oc.width=innerWidth;oc.height=innerHeight;ox.clearRect(0,0,oc.width,oc.height);if(!S.showPoly)return;const loads=S.mode==='naive'?tN:tK,mx=Math.max(...loads,1);const cw=oc.width/TC,ch=oc.height/TR;for(let r=0;r<TR;r++)for(let c=0;c<TC;c++){const load=loads[r*TC+c],ratio=load/mx,x=c*cw,y=r*ch;let red,green;if(ratio<.5){red=Math.floor(ratio*2*255);green=180}else{red=255;green=Math.floor((1-(ratio-.5)*2)*180)}ox.fillStyle=`rgba(${red},${green},40,0.08)`;ox.fillRect(x,y,cw,ch);ox.strokeStyle=`rgba(${red},${green},40,0.25)`;ox.lineWidth=1;ox.strokeRect(x,y,cw,ch);if(load>0){ox.fillStyle=`rgba(${red},${green},40,0.7)`;ox.font='10px JetBrains Mono';ox.textAlign='center';ox.fillText(Math.round(load),x+cw/2,y+ch/2+3)}}if(S.mode==='kakeya'&&polys.length){const w=oc.width,h=oc.height;polys.forEach((p,idx)=>{ox.strokeStyle=`rgba(118,185,0,${0.35+idx*0.1})`;ox.lineWidth=2;for(let px=0;px<w;px+=3){const x=(px/w)*2-1;const A=p.f,B=p.c+p.e*x,C=p.a+p.b*x+p.d*x*x;const disc=B*B-4*A*C;if(disc<0)continue;const sqd=Math.sqrt(disc);for(const sign of[-1,1]){const y=(-B+sign*sqd)/(2*A);if(y>=-1&&y<=1){const sy=(1-y)/2*h;ox.fillStyle=`rgba(118,185,0,${0.5+idx*0.1})`;ox.fillRect(px,sy-1,2,2)}}}for(let py=0;py<h;py+=3){const y=(1-py/h)*2-1;const A=p.d,B=p.b+p.e*y,C=p.a+p.c*y+p.f*y*y;const disc=B*B-4*A*C;if(disc<0)continue;const sqd=Math.sqrt(disc);for(const sign of[-1,1]){const x=(-B+sign*sqd)/(2*A);if(x>=-1&&x<=1){const sx=(x+1)/2*w;ox.fillStyle=`rgba(118,185,0,${0.5+idx*0.1})`;ox.fillRect(sx-1,py,2,2)}}}})}}
