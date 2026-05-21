@@ -1,0 +1,22 @@
+{
+  "uniform": {
+    "is_algebraic": true,
+    "concentration": 0.6741999983787537,
+    "expected_algebraic": false
+  },
+  "clustered": {
+    "is_algebraic": true,
+    "concentration": 0.9138294458389282,
+    "expected_algebraic": false
+  },
+  "planar": {
+    "is_algebraic": false,
+    "concentration": 0.2757999897003174,
+    "expected_algebraic": true
+  },
+  "cylindrical": {
+    "is_algebraic": false,
+    "concentration": 0.397599995136261,
+    "expected_algebraic": true
+  }
+}

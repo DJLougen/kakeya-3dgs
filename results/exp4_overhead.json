@@ -1,0 +1,34 @@
+{
+  "uniform": {
+    "baseline_time_ms": 317.04211235046387,
+    "polynomial_time_ms": 1363.1386756896973,
+    "overhead_ratio": 4.29955082491647,
+    "baseline_balance": 5.555997853117452,
+    "polynomial_balance": 1.14688,
+    "balance_improvement": 4.844445672709832
+  },
+  "clustered": {
+    "baseline_time_ms": 317.94047355651855,
+    "polynomial_time_ms": 1390.181303024292,
+    "overhead_ratio": 4.372457798384599,
+    "baseline_balance": 8.534081387300084,
+    "polynomial_balance": 1.231385910411865,
+    "balance_improvement": 6.930468600575158
+  },
+  "planar": {
+    "baseline_time_ms": 325.67620277404785,
+    "polynomial_time_ms": 1388.9970779418945,
+    "overhead_ratio": 4.264963378075162,
+    "baseline_balance": 2.5695774791026196,
+    "polynomial_balance": 1.14688,
+    "balance_improvement": 2.240493756192993
+  },
+  "cylindrical": {
+    "baseline_time_ms": 317.0886039733887,
+    "polynomial_time_ms": 1474.3132591247559,
+    "overhead_ratio": 4.64953089026336,
+    "baseline_balance": 2.4387827136091182,
+    "polynomial_balance": 1.14688,
+    "balance_improvement": 2.126449771213308
+  }
+}

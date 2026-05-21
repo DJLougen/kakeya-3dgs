@@ -1,0 +1,38 @@
+{
+  "uniform": {
+    "baseline_render_ms": 0.282,
+    "baseline_overhead_ms": 352.03330000513233,
+    "baseline_total_ms": 352.3153000051323,
+    "polynomial_render_ms": 0.014,
+    "polynomial_overhead_ms": 1433.7255999853369,
+    "polynomial_total_ms": 1433.7395999853368,
+    "speedup": 0.24573172144281677
+  },
+  "clustered": {
+    "baseline_render_ms": 0.241,
+    "baseline_overhead_ms": 345.24329999112524,
+    "baseline_total_ms": 345.4842999911252,
+    "polynomial_render_ms": 0.015,
+    "polynomial_overhead_ms": 1386.4211999753024,
+    "polynomial_total_ms": 1386.4361999753025,
+    "speedup": 0.2491887473778307
+  },
+  "planar": {
+    "baseline_render_ms": 0.344,
+    "baseline_overhead_ms": 342.3174000054132,
+    "baseline_total_ms": 342.6614000054132,
+    "polynomial_render_ms": 0.014,
+    "polynomial_overhead_ms": 1472.8527999832295,
+    "polynomial_total_ms": 1472.8667999832294,
+    "speedup": 0.2326492796288944
+  },
+  "cylindrical": {
+    "baseline_render_ms": 0.274,
+    "baseline_overhead_ms": 353.1696000136435,
+    "baseline_total_ms": 353.4436000136435,
+    "polynomial_render_ms": 0.014,
+    "polynomial_overhead_ms": 1394.7693000081927,
+    "polynomial_total_ms": 1394.7833000081926,
+    "speedup": 0.25340395171892827
+  }
+}

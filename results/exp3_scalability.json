@@ -1,0 +1,27 @@
+{
+  "10000": {
+    "baseline_balance": 7.571732393510359,
+    "polynomial_balance": 1.6454755448428242,
+    "improvement_ratio": 4.601546596812906
+  },
+  "25000": {
+    "baseline_balance": 9.3158471009027,
+    "polynomial_balance": 1.3133993346426711,
+    "improvement_ratio": 7.092928140882002
+  },
+  "50000": {
+    "baseline_balance": 8.534081387300084,
+    "polynomial_balance": 1.231385910411865,
+    "improvement_ratio": 6.930468600575158
+  },
+  "75000": {
+    "baseline_balance": 8.34180020870578,
+    "polynomial_balance": 1.093856404641412,
+    "improvement_ratio": 7.626046868044247
+  },
+  "100000": {
+    "baseline_balance": 8.295306854828931,
+    "polynomial_balance": 1.0665384769458799,
+    "improvement_ratio": 7.777784893971402
+  }
+}

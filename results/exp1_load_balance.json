@@ -1,0 +1,30 @@
+{
+  "uniform": {
+    "baseline_balance": 5.085052560571139,
+    "polynomial_balance": 1.6384,
+    "improvement_ratio": 3.1036697757392204,
+    "baseline_tiles": 1459,
+    "polynomial_tiles": 4096
+  },
+  "clustered": {
+    "baseline_balance": 7.571732393510359,
+    "polynomial_balance": 1.6454755448428242,
+    "improvement_ratio": 4.601546596812906,
+    "baseline_tiles": 1888,
+    "polynomial_tiles": 4096
+  },
+  "planar": {
+    "baseline_balance": 2.6002538876547128,
+    "polynomial_balance": 1.6384,
+    "improvement_ratio": 1.5870690232267533,
+    "baseline_tiles": 577,
+    "polynomial_tiles": 4096
+  },
+  "cylindrical": {
+    "baseline_balance": 2.5392623056162447,
+    "polynomial_balance": 1.6384,
+    "improvement_ratio": 1.5498427158302275,
+    "baseline_tiles": 267,
+    "polynomial_tiles": 4096
+  }
+}
